@@ -1,0 +1,302 @@
+blueprint:
+  name: WITB+ Stable (0.5.0) – Modified for your logic
+  homeassistant:
+    min_version: 2024.8.0
+  description: >
+    … (same description) …
+    Modified: handles “door closed + no motion → lights off”, plus “door opening with motion → lights off”.
+
+input:
+  sensor_entities:
+    name: Sensor Entities
+    description: ...
+    selector:
+      entity:
+        domain: binary_sensor
+        multiple: true
+  door_sensor:
+    name: Door Sensor or Door Sensor Group
+    description: ...
+    selector:
+      entity:
+        domain: binary_sensor
+        multiple: false
+  motion_sensor:
+    name: Motion Sensor or Motion Sensor Group
+    description: ...
+    selector:
+      entity:
+        domain: binary_sensor
+        multiple: false
+  light_bulbs:
+    name: Smart Light Bulb, or Smart Light Bulb Group (Optional)
+    selector:
+      entity:
+        domain: light
+        multiple: false
+    default: "light.none"
+  light_switch:
+    name: Light, Light Group, Switch, or Switch Group (Optional)
+    selector:
+      entity:
+        domain: light
+        multiple: false
+    default: "light.none"
+  fan_switch:
+    name: Fan or Fan Group (Optional)
+    selector:
+      entity:
+        domain: fan
+        multiple: false
+    default: "fan.none"
+  door_sensor_open_delay:
+    name: Door Sensor Open Delay (Optional)
+    description: ...
+    default: 0
+    selector:
+      number:
+        mode: box
+        min: 0.0
+        max: 60.0
+        unit_of_measurement: seconds
+  door_sensor_close_delay:
+    name: Door Sensor Close Delay (Optional)
+    description: ...
+    default: 0
+    selector:
+      number:
+        mode: box
+        min: 0.0
+        max: 60.0
+        unit_of_measurement: seconds
+  motion_sensor_delay:
+    name: Motion off delay (Optional)
+    description: ...
+    default: 30
+    selector:
+      number:
+        mode: box
+        min: 0.0
+        max: 3600.0
+        unit_of_measurement: seconds
+  occupancy_helper:
+    name: Occupancy Helper (Optional)
+    selector:
+      entity:
+        domain: input_boolean
+        multiple: false
+    default: "input_boolean.none"
+  bypass_mode:
+    name: Bypass Mode (Optional)
+    selector:
+      select:
+        mode: dropdown
+        options:
+          - label: No Bypass
+            value: no_bypass
+          - label: Bypass No Auto OFF
+            value: bypass_no_auto_off
+          - label: Bypass Auto OFF
+            value: bypass_auto_off
+    default: no_bypass
+  bypass_helper:
+    name: Bypass Helper (Optional)
+    selector:
+      entity:
+        domain: input_boolean
+        multiple: false
+    default: "input_boolean.none"
+  bypass_timer:
+    name: Bypass Auto Off Timer (Optional)
+    selector:
+      entity:
+        domain: timer
+        multiple: false
+    default: "timer.none"
+  bypass_finished_action:
+    name: Bypass Action After Timer Finished (Optional)
+    selector:
+      select:
+        mode: dropdown
+        options:
+          - label: Turn Off
+            value: turn_off
+          - label: Do Nothing
+            value: do_nothing
+    default: turn_off
+  idle_timer:
+    name: Idle Timer (Optional)
+    selector:
+      entity:
+        domain: timer
+        multiple: false
+    default: "timer.none"
+  light_control:
+    name: Light Control
+    description: What is controlling lighting effects? Is it a switch or a bulb?
+    default: none
+    selector:
+      select:
+        mode: dropdown
+        options:
+          - label: None
+            value: none
+          - label: Bulb
+            value: bulb
+          - label: Switch
+            value: switch
+  light_control_features:
+    name: Light Control Features
+    description: What light features to control?
+    default: []
+    selector:
+      select:
+        multiple: true
+        options:
+          - label: Use brightness value
+            value: use_brightness
+          - label: Use colour temperature value
+            value: use_colour_temperature
+          - label: Use transition value
+            value: use_transition
+  light_brightness_pct:
+    name: Light brightness Percentage (Optional)
+    default: 1
+    selector:
+      number:
+        mode: box
+        min: 1
+        max: 100
+        unit_of_measurement: percentage
+  light_temperature:
+    name: Light temperature (Optional)
+    default: 2000
+    selector:
+      number:
+        mode: box
+        min: 2000
+        max: 6500
+        unit_of_measurement: kelvin
+  light_transition:
+    name: Light Transition (Optional)
+    default: 0
+    selector:
+      number:
+        mode: box
+        min: 0
+        max: 10
+        unit_of_measurement: seconds
+
+variables:
+  door_sensor: !input door_sensor
+  door_sensor_open_delay: !input door_sensor_open_delay
+  door_sensor_close_delay: !input door_sensor_close_delay
+  motion_sensor: !input motion_sensor
+  motion_sensor_delay: !input motion_sensor_delay
+  light_bulbs: !input light_bulbs
+  light_switch: !input light_switch
+  fan_switch: !input fan_switch
+  occupancy_helper: !input occupancy_helper
+  bypass_mode: !input bypass_mode
+  bypass_helper: !input bypass_helper
+  bypass_timer: !input bypass_timer
+  bypass_finished_action: !input bypass_finished_action
+  idle_timer: !input idle_timer
+  light_control: !input light_control
+  light_control_features: !input light_control_features
+  light_brightness_pct: !input light_brightness_pct
+  light_temperature: !input light_temperature
+  light_transition: !input light_transition
+
+trigger:
+  - platform: state
+    entity_id: !input door_sensor
+    from: "off"
+    to: "on"
+    id: Door_Opened
+    for: !input door_sensor_open_delay
+  - platform: state
+    entity_id: !input door_sensor
+    from: "on"
+    to: "off"
+    id: Door_Closed
+    for: !input door_sensor_close_delay
+  - platform: state
+    entity_id: !input motion_sensor
+    from: "off"
+    to: "on"
+    id: Motion_On
+  - platform: state
+    entity_id: !input motion_sensor
+    from: "on"
+    to: "off"
+    id: Motion_Off
+    for: !input motion_sensor_delay
+  - platform: event
+    event_type: timer.finished
+    event_data:
+      entity_id: !input idle_timer
+    id: Idle_Timer_Finished
+
+action:
+  choose:
+    # 1) Door Opening + motion detected → turn OFF lights
+    - conditions:
+        - condition: trigger
+          id: Door_Opened
+        - condition: state
+          entity_id: !input motion_sensor
+          state: "on"
+      sequence:
+        - service: homeassistant.turn_off
+          target:
+            entity_id: !input light_bulbs
+        - service: homeassistant.turn_off
+          target:
+            entity_id: !input light_switch
+
+    # 2) Door Closed + no motion for delay → turn OFF lights
+    - conditions:
+        - condition: trigger
+          id: Motion_Off
+        - condition: state
+          entity_id: !input door_sensor
+          state: "off"
+      sequence:
+        - service: homeassistant.turn_off
+          target:
+            entity_id: !input light_bulbs
+        - service: homeassistant.turn_off
+          target:
+            entity_id: !input light_switch)
+
+    # 3) Motion detected (while door closed) → keep lights ON / or turn on if off
+    - conditions:
+        - condition: trigger
+          id: Motion_On
+        - condition: state
+          entity_id: !input door_sensor
+          state: "off"
+      sequence:
+        - service: homeassistant.turn_on
+          target:
+            entity_id: !input light_bulbs
+        - service: homeassistant.turn_on
+          target:
+            entity_id: !input light_switch
+
+    # 4) Door Closed event → turn ON lights if needed (unchanged behaviour)
+    - conditions:
+        - condition: trigger
+          id: Door_Closed
+      sequence:
+        # (existing “door closed” sequence from original blueprint) …
+        - service: homeassistant.turn_on
+          target:
+            entity_id: !input light_bulbs
+        - service: homeassistant.turn_on
+          target:
+            entity_id: !input light_switch
+
+mode: single
+max_exceeded: silent
