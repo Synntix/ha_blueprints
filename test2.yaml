@@ -1,0 +1,520 @@
+blueprint:
+  name: WITB+ Stable (0.5.0)
+  domain: automation
+  homeassistant:
+    min_version: 2024.8.0
+  description: >
+    WIAB+ (Wasp in the Box Plus) is an enhanced automation blueprint designed for
+    occupancy detection using multiple sensors, inspired by the "Wasp in the Box" concept.
+    The blueprint employs motion and door sensors to detect occupants (referred to as "wasps")
+    within a defined space (the "box"). If motion is detected, indicating the presence of a
+    "wasp," the state of the box is updated accordingly.
+
+    The generated binary sensor reflects the presence or absence of a wasp in the box,
+    enabling seamless integration with automation triggers.
+
+    Assumptions:
+    - Motion sensors are typically positioned to detect movement when someone walks into the room, triggering occupancy detection.
+    - **It is assumed that as long as the door to the designated area ("box") is closed, the room is considered occupied, influencing the automation’s behavior.**
+    - Users are expected to configure motion and door sensors accurately to detect occupancy within the designated area.
+    - The blueprint provides options to control smart light bulbs, light switches, and fans within the area based on occupancy detection.
+    - Users are expected to create input_boolean entities for occupancy tracking and bypass control if they choose to utilize these features.
+    - For bypass functionality, users need to manually integrate call service actions into their automations or methods to control devices when bypassing occupancy detection is required.
+
+source_url: https://github.com/asucrews/ha-blueprints/blob/main/automations/witb_plus/dev/witb_plus.yaml
+
+input:
+  sensor_entities:
+    name: Sensor Entities
+    description: The sensor entities for this automation
+    selector:
+      entity:
+        domain: binary_sensor
+        multiple: true
+  door_sensor:
+    name: Door Sensor or Door Sensor Group
+    description: > Select the door sensor or group of door sensors representing the entrance to the "box" —
+      the designated area where occupancy is detected.
+    selector:
+      entity:
+        domain: binary_sensor
+        multiple: false
+  motion_sensor:
+    name: Motion Sensor or Motion Sensor Group
+    description: > Choose the motion sensor or group of motion sensors responsible for detecting
+      movement within the designated area ("box"). In the "Wasp in a Box" analogy, the motion
+      sensor plays a crucial role in identifying the presence of "wasps" (occupants) within the space.
+    selector:
+      entity:
+        domain: binary_sensor
+        multiple: false
+  light_bulbs:
+    name: Smart Light Bulb, or Smart Light Bulb Group (Optional)
+    description: > Select a smart light bulb or group of smart light bulbs to control within the designated
+      area ("box"). These lights illuminate the space based on occupancy detected by the motion sensor.
+    default: "light.none"
+    selector:
+      entity:
+        domain: light
+        multiple: false
+  light_switch:
+    name: Light, Light Group, Switch, or Switch Group (Optional)
+    description: > Choose a light, light group, switch, or switch group to control within the designated
+      area ("box"). These devices provide illumination based on occupancy detected by the motion sensor.
+    default: "light.none"
+    selector:
+      entity:
+        domain: light
+        - switch
+        multiple: false
+  fan_switch:
+    name: Fan or Fan Group (Optional)
+    description: > Select a fan or group of fans to control within the designated area ("box"). These
+      fans regulate air circulation based on occupancy detected by the motion sensor.
+    default: "fan.none"
+    selector:
+      entity:
+        domain: fan
+        - light
+        multiple: false
+
+  sensor_options:
+    name: Sensor Options
+    description: > Options to set if you need to add delays to when sensors take actions.
+    selector:
+      object
+      collapsed: true
+  door_sensor_open_delay:
+    name: Door Sensor Open Delay (Optional)
+    description: > Specify the delay time, in seconds, for the door sensor to register an open event after detecting movement.
+    default: 0
+    selector:
+      number:
+        mode: box
+        min: 0.0
+        max: 60.0
+        unit_of_measurement: seconds
+        step: 1.0
+  door_sensor_close_delay:
+    name: Door Sensor Close Delay (Optional)
+    description: > Specify the delay time, in seconds, for the door sensor to register a close event after detecting no movement.
+    default: 0
+    selector:
+      number:
+        mode: box
+        min: 0.0
+        max: 60.0
+        unit_of_measurement: seconds
+        step: 1.0
+  motion_sensor_delay:
+    name: Motion off delay (Optional)
+    description: > Set the delay time, in seconds, for the motion sensor to turn off after detecting no movement.
+    default: 30
+    selector:
+      number:
+        mode: box
+        min: 0.0
+        max: 3600.0
+        unit_of_measurement: seconds
+        step: 1.0
+  occupancy_options:
+    name: Occupancy Options
+    description: Occupancy Settings
+    selector:
+      object
+      collapsed: true
+  occupancy_helper:
+    name: Occupancy Helper (Optional)
+    description: > Select an input boolean entity to serve as an occupancy helper within the designated area ("box").
+    default: "input_boolean.none"
+    selector:
+      entity:
+        domain: input_boolean
+        multiple: false
+  bypass_options:
+    name: Bypass Options
+    description: Bypass Mode and settings
+    selector:
+      object
+      collapsed: true
+  bypass_mode:
+    name: Bypass Mode (Optional)
+    selector:
+      select:
+        mode: dropdown
+        options:
+          - label: No Bypass
+            value: no_bypass
+          - label: Bypass No Auto OFF
+            value: bypass_no_auto_off
+          - label: Bypass Auto OFF
+            value: bypass_auto_off
+    default: no_bypass
+  bypass_helper:
+    name: Bypass Helper (Optional)
+    description: > Select an input boolean entity to serve as a bypass helper within the designated area ("box").
+    default: "input_boolean.none"
+    selector:
+      entity:
+        domain: input_boolean
+        multiple: false
+  bypass_timer:
+    name: Bypass Auto Off Timer (Optional)
+    description: > Set the duration, in seconds, for the automatic cancellation of a bypass event.
+    default: "timer.none"
+    selector:
+      entity:
+        domain: timer
+        multiple: false
+  bypass_finished_action:
+    name: Bypass Action After Timer Finished (Optional)
+    selector:
+      select:
+        mode: dropdown
+        options:
+          - label: Turn Off
+            value: turn_off
+          - label: Do Nothing
+            value: do_nothing
+    default: turn_off
+  idle_timer:
+    name: Idle Timer (Optional)
+    description: > Set the duration, in seconds, for the automatic cancellation of a bypass event.
+    default: "timer.none"
+    selector:
+      entity:
+        domain: timer
+        multiple: false
+  light_control:
+    name: Light Control
+    description: Light Control Mode and settings
+    default: none
+    selector:
+      select:
+        mode: dropdown
+        options:
+          - label: None
+            value: none
+          - label: Bulb
+            value: bulb
+          - label: Switch
+            value: switch
+  light_control_features:
+    name: Light Control Features
+    description: What light features to control?
+    default: []
+    selector:
+      select:
+        multiple: true
+        options:
+          - label: Use brightness value
+            value: use_brightness
+          - label: Use colour temperature value
+            value: use_colour_temperature
+          - label: Use transition value
+            value: use_transition
+  light_brightness_pct:
+    name: Light brightness Percentage (Optional)
+    default: 1
+    selector:
+      number:
+        mode: box
+        min: 1
+        max: 100
+        unit_of_measurement: percentage
+        step: 1
+  light_temperature:
+    name: Light temperature (Optional)
+    default: 2000
+    selector:
+      number:
+        mode: box
+        min: 2000
+        max: 6500
+        unit_of_measurement: kelvin
+        step: 1
+  light_transition:
+    name: Light Transition (Optional)
+    default: 0
+    selector:
+      number:
+        mode: box
+        min: 0
+        max: 10
+        unit_of_measurement: seconds
+        step: 1
+
+variables:
+  door_sensor: !input door_sensor
+  door_sensor_open_delay: !input door_sensor_open_delay
+  door_sensor_close_delay: !input door_sensor_close_delay
+  motion_sensor: !input motion_sensor
+  motion_sensor_delay: !input motion_sensor_delay
+  light_bulbs: !input light_bulbs
+  light_switch: !input light_switch
+  fan_switch: !input fan_switch
+  occupancy_helper: !input occupancy_helper
+  bypass_mode: !input bypass_mode
+  bypass_helper: !input bypass_helper
+  bypass_timer: !input bypass_timer
+  bypass_finished_action: !input bypass_finished_action
+  idle_timer: !input idle_timer
+  light_control: !input light_control
+  light_control_features: !input light_control_features
+  light_brightness_pct: !input light_brightness_pct
+  light_temperature: !input light_temperature
+  light_transition: !input light_transition
+
+trigger:
+  # If door is opened
+  - platform: state
+    entity_id: !input door_sensor
+    from: "off"
+    to: "on"
+    id: Door_Opened
+    for: !input door_sensor_open_delay
+  # If door is closed
+  - platform: state
+    entity_id: !input door_sensor
+    from: "on"
+    to: "off"
+    id: Door_Closed
+    for: !input door_sensor_close_delay
+  # [NEW] If door is closed AND motion off timeout passes — to turn off lights
+  # Actually using existing motion off trigger logic:
+  - platform: state
+    entity_id: !input motion_sensor
+    from: "on"
+    to: "off"
+    id: Motion_Off
+    for: !input motion_sensor_delay
+  # If motion is detected
+  - platform: state
+    entity_id: !input motion_sensor
+    from: "off"
+    to: "on"
+    id: Motion_On
+  # If bypass is enabled
+  - platform: state
+    entity_id: !input bypass_helper
+    from: "off"
+    to: "on"
+    id: Bypass_Turn_On
+  # If bypass is disabled
+  - platform: state
+    entity_id: !input bypass_helper
+    from: "on"
+    to: "off"
+    id: Bypass_Turn_Off
+  # If bypass auto off timer ends
+  - platform: event
+    event_type: timer.finished
+    event_data:
+      entity_id: !input bypass_timer
+    id: Bypass_Timer_Finished
+  # If idle timer ends
+  - platform: event
+    event_type: timer.finished
+    event_data:
+      entity_id: !input idle_timer
+    id: Idle_Timer_Finished
+
+action:
+  choose:
+    # 1) **Door Opening + motion is currently detected** → turn OFF lights
+    - conditions:
+        - condition: trigger
+          id: Door_Opened
+        - condition: state
+          entity_id: !input motion_sensor
+          state: "on"
+      sequence:
+        - service: homeassistant.turn_off
+          target:
+            entity_id: !input light_bulbs
+        - service: homeassistant.turn_off
+          target:
+            entity_id: !input light_switch
+
+    # 2) **Door is closed AND no motion (motion sensor off timeout) → turn OFF lights**
+    - conditions:
+        - condition: trigger
+          id: Motion_Off
+        - condition: state
+          entity_id: !input door_sensor
+          state: "off"
+      sequence:
+        - service: homeassistant.turn_off
+          target:
+            entity_id: !input light_bulbs
+        - service: homeassistant.turn_off
+          target:
+            entity_id: !input light_switch
+
+    # 3) **Motion detected while door is closed** → keep / turn ON lights
+    - conditions:
+        - condition: trigger
+          id: Motion_On
+        - condition: state
+          entity_id: !input door_sensor
+          state: "off"
+      sequence:
+        - service: homeassistant.turn_on
+          target:
+            entity_id: !input light_bulbs
+        - service: homeassistant.turn_on
+          target:
+            entity_id: !input light_switch
+
+    # 4) **Door closed event** → existing “door closed” behaviour (turn lights on) — keep as is
+    - conditions:
+        - condition: trigger
+          id: Door_Closed
+      sequence:
+        # (existing logic for door closed from original blueprint) …
+        - if:
+            - condition: template
+              value_template: "{{ occupancy_helper != 'input_boolean.none' }}"
+          then:
+            - service: homeassistant.turn_on
+              data: {}
+              target:
+                entity_id: !input occupancy_helper
+        - if:
+            - condition: template
+              value_template: "{{ bypass_helper != 'input_boolean.none' }}"
+            - condition: state
+              entity_id: !input bypass_helper
+              state: "on"
+          then:
+            - stop: Bypass Enabled
+        - if:
+            - condition: and
+              conditions:
+                - condition: template
+                  value_template: "{{ light_bulbs != 'light.none' }}"
+                - condition: state
+                  entity_id: !input light_bulbs
+                  state: "off"
+          then:
+            - choose:
+                - conditions:
+                    - condition: template
+                      value_template: "{{ light_control == 'bulb' }}"
+                  sequence:
+                    - choose:
+                        - conditions:
+                            - condition: template
+                              value_template: "{{ light_control_features | list | length == 1 }}"
+                          sequence:
+                            - choose:
+                                - conditions:
+                                    - condition: template
+                                      value_template: "{{ 'use_brightness' in light_control_features }}"
+                                  sequence:
+                                    - action: light.turn_on
+                                      data:
+                                        brightness_pct: !input light_brightness_pct
+                                      target:
+                                        entity_id: !input light_bulbs
+                                - conditions:
+                                    - condition: template
+                                      value_template: "{{ 'use_colour_temperature' in light_control_features }}"
+                                  sequence:
+                                    - action: light.turn_on
+                                      data:
+                                        kelvin: !input light_temperature
+                                      target:
+                                        entity_id: !input light_bulbs
+                                - conditions:
+                                    - condition: template
+                                      value_template: "{{ 'use_transition' in light_control_features }}"
+                                  sequence:
+                                    - action: light.turn_on
+                                      data:
+                                        transition: !input light_transition
+                                      target:
+                                        entity_id: !input light_bulbs
+                        - conditions:
+                            - condition: template
+                              value_template: "{{ light_control_features | list | length == 2 }}"
+                          sequence:
+                            - choose:
+                                - conditions:
+                                    - condition: template
+                                      value_template: "{{ 'use_brightness' in light_control_features and 'use_colour_temperature' in light_control_features and not 'use_transition' in light_control_features }}"
+                                  sequence:
+                                    - action: light.turn_on
+                                      data:
+                                        kelvin: !input light_temperature
+                                        brightness_pct: !input light_brightness_pct
+                                      target:
+                                        entity_id: !input light_bulbs
+                                - conditions:
+                                    - condition: template
+                                      value_template: "{{ 'use_brightness' in light_control_features and not 'use_colour_temperature' in light_control_features and 'use_transition' in light_control_features }}"
+                                  sequence:
+                                    - action: light.turn_on
+                                      data:
+                                        transition: !input light_transition
+                                        brightness_pct: !input light_brightness_pct
+                                      target:
+                                        entity_id: !input light_bulbs
+                                - conditions:
+                                    - condition: template
+                                      value_template: "{{ not 'use_brightness' in light_control_features and 'use_colour_temperature' in light_control_features and 'use_transition' in light_control_features }}"
+                                  sequence:
+                                    - action: light.turn_on
+                                      data:
+                                        transition: !input light_transition
+                                        kelvin: !input light_temperature
+                                      target:
+                                        entity_id: !input light_bulbs
+                        - conditions:
+                            - condition: template
+                              value_template: "{{ light_control_features | list | length == 3 }}"
+                          sequence:
+                            - action: light.turn_on
+                              data:
+                                transition: !input light_transition
+                                kelvin: !input light_temperature
+                                brightness_pct: !input light_brightness_pct
+                              target:
+                                entity_id: !input light_bulbs
+                - default:
+                    - condition: state
+                      entity_id: !input light_bulbs
+                      state: "off"
+                    - action: homeassistant.turn_on
+                      target:
+                        entity_id: !input light_bulbs
+        - if:
+            - condition: and
+              conditions:
+                - condition: template
+                  value_template: "{{ light_switch != 'light.none' }}"
+                - condition: state
+                  entity_id: !input light_switch
+                  state: "off"
+          then:
+            - service: homeassistant.turn_on
+              data: {}
+              target:
+                entity_id: !input light_switch
+        - if:
+            - condition: and
+              conditions:
+                - condition: template
+                  value_template: "{{ fan_switch != 'fan.none' }}"
+                - condition: state
+                  entity_id: !input fan_switch
+                  state: "off"
+          then:
+            - service: homeassistant.turn_on
+              data: {}
+              target:
+                entity_id: !input fan_switch
+
+  mode: single
+  max_exceeded: silent
+
